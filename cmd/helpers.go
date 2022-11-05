@@ -112,6 +112,11 @@ func relabelEligibleTorrents(log *logrus.Entry, c client.Interface, torrents map
 			log.Tracef("Not relabeling %s: %s", h, t.Name)
 			ignoredTorrents++
 			continue
+		} else if label == t.Label {
+			// torrent already has the correct label
+			log.Tracef("Torrent already has correct label: %s", t.Name)
+			ignoredTorrents++
+			continue
 		}
 
 		// relabel
