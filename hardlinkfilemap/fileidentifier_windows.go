@@ -1,6 +1,7 @@
 package hardlinkfilemap
 
 import (
+	"errors"
 	"os"
 	"reflect"
 	"strconv"
