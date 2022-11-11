@@ -1,5 +1,3 @@
-//go:build !windows && !plan9
-
 package hardlinkfilemap
 
 import (

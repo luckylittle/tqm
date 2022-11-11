@@ -107,10 +107,6 @@ func (t *HardlinkFileMap) IsTorrentUnique(torrent config.Torrent) bool {
 			return false
 		}
 
-		t.log.Infof("File: %s - ID: %s", f, id)
-		// preview the file id entry
-		t.log.Infof("File ID Entry: %v", t.hardlinkFileMap[id])
-
 		if paths, exists := t.hardlinkFileMap[id]; exists && len(paths) > 1 {
 			return false
 		}
