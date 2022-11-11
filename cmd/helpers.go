@@ -9,6 +9,7 @@ import (
 
 	"github.com/l3uddz/tqm/client"
 	"github.com/l3uddz/tqm/config"
+	"github.com/l3uddz/tqm/hardlinkfilemap"
 	"github.com/l3uddz/tqm/torrentfilemap"
 )
 
@@ -97,7 +98,7 @@ func relabelEligibleTorrents(log *logrus.Entry, c client.Interface, torrents map
 			// torrent file is not unique, files are contained within another torrent
 			// so we cannot safely change the label in-case of auto move
 			nonUniqueTorrents++
-			log.Warnf("Skipping non unique torrent: %+v", t)
+			log.Warnf("Skipping non unique torrent | Name: %s / Label: %s / Tags: %s / Tracker: %s", t.Name, t.Label, strings.Join(t.Tags, ", "), t.TrackerName)
 			continue
 		}
 
@@ -153,7 +154,7 @@ func relabelEligibleTorrents(log *logrus.Entry, c client.Interface, torrents map
 
 // remove torrents that meet remove filters
 func removeEligibleTorrents(log *logrus.Entry, c client.Interface, torrents map[string]config.Torrent,
-	tfm *torrentfilemap.TorrentFileMap) error {
+	tfm *torrentfilemap.TorrentFileMap, hfm *hardlinkfilemap.HardlinkFileMap) error {
 	// vars
 	ignoredTorrents := 0
 	hardRemoveTorrents := 0
@@ -210,8 +211,9 @@ func removeEligibleTorrents(log *logrus.Entry, c client.Interface, torrents map[
 		removedTorrentBytes += t.DownloadedBytes
 		hardRemoveTorrents++
 
-		// remove the torrent from the torrent file map
+		// remove the torrent from the torrent maps
 		tfm.Remove(*t)
+		hfm.RemoveByTorrent(*t)
 		delete(torrents, h)
 	}
 
@@ -247,11 +249,17 @@ func removeEligibleTorrents(log *logrus.Entry, c client.Interface, torrents map[
 		}
 
 		// torrent meets the remove filters
-		// are the files unique and eligible for a hard deletion (remove data)
-		uniqueTorrent := tfm.IsUnique(t)
 
-		if !uniqueTorrent {
-			log.Tracef("%s not unique adding to canidates", t.Name)
+		// are the files unique and eligible for a hard deletion (remove data)
+		if !tfm.IsUnique(t) {
+			log.Warnf("Skipping non unique torrent | Name: %s / Label: %s / Tags: %s / Tracker: %s", t.Name, t.Label, strings.Join(t.Tags, ", "), t.TrackerName)
+			canidates[h] = t
+			continue
+		}
+
+		// are the files not hardlinked to other torrents
+		if !hfm.IsTorrentUnique(t) {
+			log.Warnf("Skipping non unique torrent (hardlinked) | Name: %s / Label: %s / Tags: %s / Tracker: %s", t.Name, t.Label, strings.Join(t.Tags, ", "), t.TrackerName)
 			canidates[h] = t
 			continue
 		}
@@ -268,12 +276,13 @@ func removeEligibleTorrents(log *logrus.Entry, c client.Interface, torrents map[
 	// or can be safely removed
 	for _, t := range canidates {
 		tfm.Remove(t)
+		hfm.RemoveByTorrent(t)
 	}
 
 	// check again for unique torrents
 	removedCanidates := 0
 	for h, t := range canidates {
-		noInstances := tfm.NoInstances(t)
+		noInstances := tfm.NoInstances(t) && hfm.NoInstances(t)
 
 		if !noInstances {
 			log.Tracef("%s still not unique unique", t.Name)
