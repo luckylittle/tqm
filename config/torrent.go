@@ -50,6 +50,9 @@ type Torrent struct {
 	// tracker
 	TrackerName   string `json:"TrackerName"`
 	TrackerStatus string `json:"TrackerStatus"`
+
+	// set by command
+	HardlinkedOutsideClient bool `json:"-"`
 }
 
 func (t *Torrent) IsUnregistered() bool {

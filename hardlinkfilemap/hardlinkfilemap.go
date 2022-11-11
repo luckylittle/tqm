@@ -6,12 +6,12 @@ import (
 
 	"github.com/l3uddz/tqm/config"
 	"github.com/l3uddz/tqm/logger"
-	"github.com/l3uddz/tqm/sliceutils"
+	"github.com/scylladb/go-set/strset"
 )
 
 func New(torrents map[string]config.Torrent, torrentPathMapping map[string]string) *HardlinkFileMap {
 	tfm := &HardlinkFileMap{
-		hardlinkFileMap:    make(map[string][]string),
+		hardlinkFileMap:    make(map[string]*strset.Set),
 		log:                logger.GetLogger("hardlinkfilemap"),
 		torrentPathMapping: torrentPathMapping,
 	}
@@ -33,27 +33,27 @@ func (t *HardlinkFileMap) ConsiderPathMapping(path string) string {
 	return path
 }
 
-func (t *HardlinkFileMap) FileIdentifierByPath(path string) (string, bool) {
+func (t *HardlinkFileMap) LinkInfoByPath(path string) (string, uint64, bool) {
 	stat, err1 := os.Stat(path)
 	if err1 != nil {
 		t.log.Warnf("Failed to stat file: %s - %s", path, err1)
-		return "", false
+		return "", 0, false
 	}
 
-	id, err2 := FileIdentifier(stat)
+	id, nlink, err2 := LinkInfo(stat, path)
 	if err2 != nil {
 		t.log.Warnf("Failed to get file identifier: %s - %s", path, err2)
-		return "", false
+		return "", 0, false
 	}
 
-	return id, true
+	return id, nlink, true
 }
 
 func (t *HardlinkFileMap) AddByTorrent(torrent config.Torrent) {
 	for _, f := range torrent.Files {
 		f = t.ConsiderPathMapping(f)
 
-		id, ok := t.FileIdentifierByPath(f)
+		id, _, ok := t.LinkInfoByPath(f)
 
 		if !ok {
 			continue
@@ -61,12 +61,12 @@ func (t *HardlinkFileMap) AddByTorrent(torrent config.Torrent) {
 
 		if _, exists := t.hardlinkFileMap[id]; exists {
 			// file id already associated with other paths
-			t.hardlinkFileMap[id] = append(t.hardlinkFileMap[id], f)
+			t.hardlinkFileMap[id].Add(f)
 			continue
 		}
 
 		// file id has not been seen before, create id entry
-		t.hardlinkFileMap[id] = []string{f}
+		t.hardlinkFileMap[id] = strset.New(f)
 	}
 }
 
@@ -74,7 +74,7 @@ func (t *HardlinkFileMap) RemoveByTorrent(torrent config.Torrent) {
 	for _, f := range torrent.Files {
 		f = t.ConsiderPathMapping(f)
 
-		id, ok := t.FileIdentifierByPath(f)
+		id, _, ok := t.LinkInfoByPath(f)
 
 		if !ok {
 			continue
@@ -82,13 +82,10 @@ func (t *HardlinkFileMap) RemoveByTorrent(torrent config.Torrent) {
 
 		if _, exists := t.hardlinkFileMap[id]; exists {
 			// remove this path from the id entry
-			i := sliceutils.IndexOfString(t.hardlinkFileMap[id], f)
-			if i != -1 {
-				t.hardlinkFileMap[id] = sliceutils.FastDelete(t.hardlinkFileMap[id], i)
-			}
+			t.hardlinkFileMap[id].Remove(f)
 
 			// remove id entry if no more paths
-			if len(t.hardlinkFileMap[id]) == 0 {
+			if t.hardlinkFileMap[id].Size() == 0 {
 				delete(t.hardlinkFileMap, id)
 			}
 
@@ -97,17 +94,44 @@ func (t *HardlinkFileMap) RemoveByTorrent(torrent config.Torrent) {
 	}
 }
 
+func (t *HardlinkFileMap) CountLinks(f string) (inmap uint64, total uint64, ok bool) {
+	f = t.ConsiderPathMapping(f)
+	id, nlink, ok := t.LinkInfoByPath(f)
+
+	if !ok {
+		return 0, 0, false
+	}
+
+	if paths, exists := t.hardlinkFileMap[id]; exists {
+		return uint64(paths.Size()), nlink, true
+	}
+
+	return 0, nlink, true
+}
+
+func (t *HardlinkFileMap) HardlinkedOutsideClient(torrent config.Torrent) bool {
+	for _, f := range torrent.Files {
+		inmap, total, ok := t.CountLinks(f)
+		if !ok {
+			continue
+		}
+
+		if total != inmap {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (t *HardlinkFileMap) IsTorrentUnique(torrent config.Torrent) bool {
 	for _, f := range torrent.Files {
-		f = t.ConsiderPathMapping(f)
-
-		id, ok := t.FileIdentifierByPath(f)
-
+		c, _, ok := t.CountLinks(f)
 		if !ok {
 			return false
 		}
 
-		if paths, exists := t.hardlinkFileMap[id]; exists && len(paths) > 1 {
+		if c > 1 {
 			return false
 		}
 	}
@@ -117,15 +141,12 @@ func (t *HardlinkFileMap) IsTorrentUnique(torrent config.Torrent) bool {
 
 func (t *HardlinkFileMap) NoInstances(torrent config.Torrent) bool {
 	for _, f := range torrent.Files {
-		f = t.ConsiderPathMapping(f)
-
-		id, ok := t.FileIdentifierByPath(f)
-
+		c, _, ok := t.CountLinks(f)
 		if !ok {
 			return false
 		}
 
-		if paths, exists := t.hardlinkFileMap[id]; exists && len(paths) != 0 {
+		if c != 0 {
 			return false
 		}
 	}

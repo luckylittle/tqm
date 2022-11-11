@@ -118,7 +118,7 @@ var cleanCmd = &cobra.Command{
 		tfm := torrentfilemap.New(torrents)
 		log.Infof("Mapped torrents to %d unique torrent files", tfm.Length())
 
-		// create map of paths associated to underlying file ids
+		// download path mapping
 		clientDownloadPathMapping, err := getClientDownloadPathMapping(clientConfig)
 		if err != nil {
 			log.WithError(err).Fatal("Failed loading client download path mappings")
@@ -127,9 +127,16 @@ var cleanCmd = &cobra.Command{
 				clientDownloadPathMapping)
 		}
 
+		// create map of paths associated to underlying file ids
 		start := time.Now()
 		hfm := hardlinkfilemap.New(torrents, clientDownloadPathMapping)
 		log.Infof("Mapped all torrent file paths to %d unique underlying file IDs in %s", hfm.Length(), time.Since(start))
+
+		// add HardlinkedOutsideClient field to torrents
+		for h, t := range torrents {
+			t.HardlinkedOutsideClient = hfm.HardlinkedOutsideClient(t)
+			torrents[h] = t
+		}
 
 		// remove torrents that are not ignored and match remove criteria
 		if err := removeEligibleTorrents(log, c, torrents, tfm, hfm); err != nil {
