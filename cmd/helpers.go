@@ -94,14 +94,6 @@ func relabelEligibleTorrents(log *logrus.Entry, c client.Interface, torrents map
 
 	// iterate torrents
 	for h, t := range torrents {
-		if !tfm.IsUnique(t) {
-			// torrent file is not unique, files are contained within another torrent
-			// so we cannot safely change the label in-case of auto move
-			nonUniqueTorrents++
-			log.Warnf("Skipping non unique torrent | Name: %s / Label: %s / Tags: %s / Tracker: %s", t.Name, t.Label, strings.Join(t.Tags, ", "), t.TrackerName)
-			continue
-		}
-
 		// should we relabel torrent?
 		label, relabel, err := c.ShouldRelabel(&t)
 		if err != nil {
@@ -117,6 +109,14 @@ func relabelEligibleTorrents(log *logrus.Entry, c client.Interface, torrents map
 			// torrent already has the correct label
 			log.Tracef("Torrent already has correct label: %s", t.Name)
 			ignoredTorrents++
+			continue
+		}
+
+		if !tfm.IsUnique(t) {
+			// torrent file is not unique, files are contained within another torrent
+			// so we cannot safely change the label in-case of auto move
+			nonUniqueTorrents++
+			log.Warnf("Skipping non unique torrent | Name: %s / Label: %s / Tags: %s / Tracker: %s", t.Name, t.Label, strings.Join(t.Tags, ", "), t.TrackerName)
 			continue
 		}
 
