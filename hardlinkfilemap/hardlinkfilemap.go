@@ -9,7 +9,7 @@ import (
 	"github.com/scylladb/go-set/strset"
 )
 
-func New(torrents map[string]config.Torrent, torrentPathMapping map[string]string) *HardlinkFileMap {
+func New(torrents map[string]config.Torrent, torrentPathMapping map[string]string) HardlinkFileMapI {
 	tfm := &HardlinkFileMap{
 		hardlinkFileMap:    make(map[string]*strset.Set),
 		log:                logger.GetLogger("hardlinkfilemap"),
@@ -23,7 +23,7 @@ func New(torrents map[string]config.Torrent, torrentPathMapping map[string]strin
 	return tfm
 }
 
-func (t *HardlinkFileMap) ConsiderPathMapping(path string) string {
+func (t *HardlinkFileMap) considerPathMapping(path string) string {
 	for mapFrom, mapTo := range t.torrentPathMapping {
 		if strings.HasPrefix(path, mapFrom) {
 			return strings.Replace(path, mapFrom, mapTo, 1)
@@ -33,7 +33,7 @@ func (t *HardlinkFileMap) ConsiderPathMapping(path string) string {
 	return path
 }
 
-func (t *HardlinkFileMap) LinkInfoByPath(path string) (string, uint64, bool) {
+func (t *HardlinkFileMap) linkInfoByPath(path string) (string, uint64, bool) {
 	stat, err1 := os.Stat(path)
 	if err1 != nil {
 		t.log.Warnf("Failed to stat file: %s - %s", path, err1)
@@ -51,9 +51,9 @@ func (t *HardlinkFileMap) LinkInfoByPath(path string) (string, uint64, bool) {
 
 func (t *HardlinkFileMap) AddByTorrent(torrent config.Torrent) {
 	for _, f := range torrent.Files {
-		f = t.ConsiderPathMapping(f)
+		f = t.considerPathMapping(f)
 
-		id, _, ok := t.LinkInfoByPath(f)
+		id, _, ok := t.linkInfoByPath(f)
 
 		if !ok {
 			continue
@@ -72,9 +72,9 @@ func (t *HardlinkFileMap) AddByTorrent(torrent config.Torrent) {
 
 func (t *HardlinkFileMap) RemoveByTorrent(torrent config.Torrent) {
 	for _, f := range torrent.Files {
-		f = t.ConsiderPathMapping(f)
+		f = t.considerPathMapping(f)
 
-		id, _, ok := t.LinkInfoByPath(f)
+		id, _, ok := t.linkInfoByPath(f)
 
 		if !ok {
 			continue
@@ -94,9 +94,9 @@ func (t *HardlinkFileMap) RemoveByTorrent(torrent config.Torrent) {
 	}
 }
 
-func (t *HardlinkFileMap) CountLinks(f string) (inmap uint64, total uint64, ok bool) {
-	f = t.ConsiderPathMapping(f)
-	id, nlink, ok := t.LinkInfoByPath(f)
+func (t *HardlinkFileMap) countLinks(f string) (inmap uint64, total uint64, ok bool) {
+	f = t.considerPathMapping(f)
+	id, nlink, ok := t.linkInfoByPath(f)
 
 	if !ok {
 		return 0, 0, false
@@ -111,7 +111,7 @@ func (t *HardlinkFileMap) CountLinks(f string) (inmap uint64, total uint64, ok b
 
 func (t *HardlinkFileMap) HardlinkedOutsideClient(torrent config.Torrent) bool {
 	for _, f := range torrent.Files {
-		inmap, total, ok := t.CountLinks(f)
+		inmap, total, ok := t.countLinks(f)
 		if !ok {
 			continue
 		}
@@ -126,7 +126,7 @@ func (t *HardlinkFileMap) HardlinkedOutsideClient(torrent config.Torrent) bool {
 
 func (t *HardlinkFileMap) IsTorrentUnique(torrent config.Torrent) bool {
 	for _, f := range torrent.Files {
-		c, _, ok := t.CountLinks(f)
+		c, _, ok := t.countLinks(f)
 		if !ok {
 			return false
 		}
@@ -141,7 +141,7 @@ func (t *HardlinkFileMap) IsTorrentUnique(torrent config.Torrent) bool {
 
 func (t *HardlinkFileMap) NoInstances(torrent config.Torrent) bool {
 	for _, f := range torrent.Files {
-		c, _, ok := t.CountLinks(f)
+		c, _, ok := t.countLinks(f)
 		if !ok {
 			return false
 		}

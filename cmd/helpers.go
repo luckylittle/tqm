@@ -25,8 +25,7 @@ func removeSlice(slice []string, remove []string) []string {
 }
 
 // retag torrent that meet required filters
-func retagEligibleTorrents(log *logrus.Entry, c client.TagInterface, torrents map[string]config.Torrent,
-	tfm *torrentfilemap.TorrentFileMap) error {
+func retagEligibleTorrents(log *logrus.Entry, c client.TagInterface, torrents map[string]config.Torrent) error {
 	// vars
 	ignoredTorrents := 0
 	retaggedTorrents := 0
@@ -154,7 +153,7 @@ func relabelEligibleTorrents(log *logrus.Entry, c client.Interface, torrents map
 
 // remove torrents that meet remove filters
 func removeEligibleTorrents(log *logrus.Entry, c client.Interface, torrents map[string]config.Torrent,
-	tfm *torrentfilemap.TorrentFileMap, hfm *hardlinkfilemap.HardlinkFileMap) error {
+	tfm *torrentfilemap.TorrentFileMap, hfm hardlinkfilemap.HardlinkFileMapI) error {
 	// vars
 	ignoredTorrents := 0
 	hardRemoveTorrents := 0
