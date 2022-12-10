@@ -2,11 +2,12 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+
 	"github.com/l3uddz/tqm/runtime"
 	"github.com/l3uddz/tqm/stringutils"
 	"github.com/l3uddz/tqm/tracker"
-	"os"
-	"path/filepath"
 
 	"github.com/l3uddz/tqm/config"
 	"github.com/l3uddz/tqm/logger"
@@ -22,8 +23,9 @@ var (
 	flagConfigFolder = config.GetDefaultConfigDirectory("tqm", flagConfigFile)
 	flagLogFile      = "activity.log"
 
-	flagFilterName string
-	flagDryRun     bool
+	flagFilterName                       string
+	flagDryRun                           bool
+	flagExperimentalRelabelForCrossSeeds bool
 
 	// Global vars
 	log         *logrus.Entry
@@ -52,6 +54,7 @@ func init() {
 	rootCmd.PersistentFlags().CountVarP(&flagLogLevel, "verbose", "v", "Verbose level")
 
 	rootCmd.PersistentFlags().BoolVar(&flagDryRun, "dry-run", false, "Dry run mode")
+	rootCmd.PersistentFlags().BoolVar(&flagExperimentalRelabelForCrossSeeds, "experimental-relabel", false, "Enable experimental relabeling for cross-seeded torrents, using hardlinks (only qbit for now")
 }
 
 func initCore(showAppInfo bool) {

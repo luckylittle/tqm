@@ -3,6 +3,7 @@ package client
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -30,6 +31,9 @@ type QBittorrent struct {
 	log        *logrus.Entry
 	clientType string
 	client     *qbittorrent.Client
+
+	// need to be loaded by LoadLabelPathMap
+	labelPathMap map[string]string
 
 	// set by cmd handler
 	freeSpaceGB  float64
@@ -88,6 +92,33 @@ func (c *QBittorrent) Connect() error {
 
 	c.log.Debugf("API Version: %v", apiVersion)
 	return nil
+}
+
+func (c *QBittorrent) LoadLabelPathMap() error {
+	p, err := c.client.Application.GetAppPreferences()
+	if err != nil {
+		return fmt.Errorf("get app preferences: %w", err)
+	}
+
+	cats, err := c.client.Torrent.GetCategories()
+	if err != nil {
+		return fmt.Errorf("get categories: %w", err)
+	}
+
+	c.labelPathMap = make(map[string]string)
+	for _, cat := range cats {
+		if cat.SavePath != "" {
+			c.labelPathMap[cat.Name] = cat.SavePath
+		} else {
+			c.labelPathMap[cat.Name] = filepath.Join(p.SavePath, cat.Name)
+		}
+	}
+
+	return nil
+}
+
+func (c *QBittorrent) LabelPathMap() map[string]string {
+	return c.labelPathMap
 }
 
 func (c *QBittorrent) GetTorrents() (map[string]config.Torrent, error) {
@@ -228,13 +259,65 @@ func (c *QBittorrent) RemoveTorrent(hash string, deleteData bool) (bool, error) 
 	return true, nil
 }
 
-func (c *QBittorrent) SetTorrentLabel(hash string, label string) error {
+func (c *QBittorrent) SetTorrentLabel(hash string, label string, hardlink bool) error {
+	if hardlink {
+		// get label path
+		lp := c.labelPathMap[label]
+		if lp == "" {
+			return fmt.Errorf("label path not found for label %v", label)
+		}
+
+		// get torrent details
+		td, err := c.client.Torrent.GetProperties(hash)
+		if err != nil {
+			return fmt.Errorf("get torrent properties: %w", err)
+		}
+
+		if filepath.Clean(td.SavePath) != filepath.Clean(lp) {
+			// get torrent files
+			tf, err := c.client.Torrent.GetContents(hash)
+			if err != nil {
+				return fmt.Errorf("get torrent files: %w", err)
+			}
+
+			for _, f := range tf {
+				source := filepath.Join(td.SavePath, f.Name)
+				target := filepath.Join(lp, f.Name)
+				if _, err := os.Stat(source); err != nil {
+					return fmt.Errorf("stat file '%v': %w", target, err)
+				}
+
+				// create target directory
+				if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+					return fmt.Errorf("create target directory: %w", err)
+				}
+
+				// link
+				if err := os.Link(source, target); err != nil {
+					return fmt.Errorf("create hardlink for '%v': %w", f.Name, err)
+				}
+			}
+		}
+
+		// if just setting category and letting autotmm move
+		// qbit force moves the files, overwriting existing files
+		// manually settings location, and then setting category works
+		// and causes qbit to recheck instead of move
+		if err := c.client.Torrent.SetAutomaticManagement([]string{hash}, false); err != nil {
+			return fmt.Errorf("set automatic management: %w", err)
+		}
+		if err := c.client.Torrent.SetLocations([]string{hash}, lp); err != nil {
+			return fmt.Errorf("set location: %w", err)
+		}
+	}
+
 	// set label
 	if err := c.client.Torrent.SetCategories([]string{hash}, label); err != nil {
 		return fmt.Errorf("set torrent label: %v: %w", label, err)
 	}
 
-	if c.EnableAutoTmmAfterRelabel {
+	// enable autotmm
+	if c.EnableAutoTmmAfterRelabel && !hardlink {
 		if err := c.client.Torrent.SetAutomaticManagement([]string{hash}, true); err != nil {
 			return fmt.Errorf("enable autotmm: %w", err)
 		}

@@ -99,6 +99,11 @@ var relabelCmd = &cobra.Command{
 			}
 		}
 
+		// load client label path map
+		if err := c.LoadLabelPathMap(); err != nil {
+			log.WithError(err).Fatal("Failed loading label path map")
+		}
+
 		// retrieve torrents
 		torrents, err := c.GetTorrents()
 		if err != nil {
