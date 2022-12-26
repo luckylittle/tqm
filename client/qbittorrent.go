@@ -107,11 +107,17 @@ func (c *QBittorrent) LoadLabelPathMap() error {
 
 	c.labelPathMap = make(map[string]string)
 	for _, cat := range cats {
-		if cat.SavePath != "" {
-			c.labelPathMap[cat.Name] = cat.SavePath
-		} else {
+		if cat.SavePath == "" {
 			c.labelPathMap[cat.Name] = filepath.Join(p.SavePath, cat.Name)
+			continue
 		}
+
+		if filepath.IsAbs(cat.SavePath) {
+			c.labelPathMap[cat.Name] = cat.SavePath
+			continue
+		}
+
+		c.labelPathMap[cat.Name] = filepath.Join(p.SavePath, cat.SavePath)
 	}
 
 	return nil
