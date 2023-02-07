@@ -140,8 +140,9 @@ var relabelCmd = &cobra.Command{
 			log.Infof("Mapped all torrent file paths to %d unique underlying file IDs in %s", hfm.Length(), time.Since(start))
 
 			// add HardlinkedOutsideClient field to torrents
-			for _, t := range torrents {
+			for h, t := range torrents {
 				t.HardlinkedOutsideClient = hfm.HardlinkedOutsideClient(t)
+                                torrents[h] = t
 			}
 		} else {
 			log.Warnf("Not mapping hardlinks for client %q", clientName)
