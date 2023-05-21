@@ -49,6 +49,7 @@ require (
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
+	github.com/scylladb/go-set v1.0.2
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/tcnksm/go-gitconfig v0.1.2 // indirect
 	golang.org/x/text v0.3.7 // indirect
@@ -56,3 +57,5 @@ require (
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/l3uddz/go-qbt v1.0.1 => github.com/SweetMNM/go-qbt v1.0.2-0.20220928185535-3f64c8c30e9a

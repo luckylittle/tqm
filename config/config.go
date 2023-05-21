@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+
 	"github.com/knadh/koanf"
 	"github.com/knadh/koanf/parsers/yaml"
 	"github.com/knadh/koanf/providers/file"
@@ -11,9 +12,10 @@ import (
 )
 
 type Configuration struct {
-	Clients  map[string]map[string]interface{}
-	Filters  map[string]FilterConfiguration
-	Trackers tracker.Config
+	Clients                    map[string]map[string]interface{}
+	Filters                    map[string]FilterConfiguration
+	Trackers                   tracker.Config
+	BypassIgnoreIfUnregistered bool
 }
 
 /* Vars */

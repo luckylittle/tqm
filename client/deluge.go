@@ -123,6 +123,15 @@ func (c *Deluge) Connect() error {
 	return nil
 }
 
+func (c *Deluge) LoadLabelPathMap() error {
+	// @TODO: implement
+	return nil
+}
+
+func (c *Deluge) LabelPathMap() map[string]string {
+	return nil
+}
+
 func (c *Deluge) GetTorrents() (map[string]config.Torrent, error) {
 	// retrieve torrents from client
 	c.log.Tracef("Retrieving torrents...")
@@ -227,7 +236,12 @@ func (c *Deluge) RemoveTorrent(hash string, deleteData bool) (bool, error) {
 	return true, nil
 }
 
-func (c *Deluge) SetTorrentLabel(hash string, label string) error {
+func (c *Deluge) SetTorrentLabel(hash string, label string, hardlink bool) error {
+	// hardlink behaviour currently not tested for deluge
+	if hardlink {
+		return fmt.Errorf("hardlink relabeling not supported for deluge (yet)")
+	}
+
 	// set label
 	if err := c.client.SetTorrentLabel(hash, label); err != nil {
 		return fmt.Errorf("set torrent label: %v: %w", label, err)

@@ -59,6 +59,16 @@ func (t *TorrentFileMap) IsUnique(torrent config.Torrent) bool {
 	return true
 }
 
+func (t *TorrentFileMap) NoInstances(torrent config.Torrent) bool {
+	for _, f := range torrent.Files {
+		if torrents, exists := t.torrentFileMap[f]; exists && len(torrents) >= 1 {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (t *TorrentFileMap) HasPath(path string, torrentPathMapping map[string]string) bool {
 	// contains check
 	for torrentPath := range t.torrentFileMap {

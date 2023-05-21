@@ -1,6 +1,7 @@
 package config
 
 import (
+	"math"
 	"strings"
 
 	"github.com/l3uddz/tqm/sliceutils"
@@ -49,10 +50,13 @@ type Torrent struct {
 	// tracker
 	TrackerName   string `json:"TrackerName"`
 	TrackerStatus string `json:"TrackerStatus"`
+
+	// set by command
+	HardlinkedOutsideClient bool `json:"-"`
 }
 
 func (t *Torrent) IsUnregistered() bool {
-	if t.TrackerStatus == "" {
+	if t.TrackerStatus == "" || strings.Contains(t.TrackerStatus, "Tracker is down") {
 		return false
 	}
 
@@ -105,4 +109,8 @@ func (t *Torrent) HasAnyTag(tags ...string) bool {
 	}
 
 	return false
+}
+
+func (t *Torrent) Log(n float64) float64 {
+	return math.Log(n)
 }

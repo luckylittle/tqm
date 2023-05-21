@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
@@ -9,7 +10,9 @@ import (
 	"github.com/l3uddz/tqm/client"
 	"github.com/l3uddz/tqm/config"
 	"github.com/l3uddz/tqm/expression"
+	"github.com/l3uddz/tqm/hardlinkfilemap"
 	"github.com/l3uddz/tqm/logger"
+	"github.com/l3uddz/tqm/sliceutils"
 	"github.com/l3uddz/tqm/torrentfilemap"
 	"github.com/l3uddz/tqm/tracker"
 )
@@ -116,8 +119,35 @@ var cleanCmd = &cobra.Command{
 		tfm := torrentfilemap.New(torrents)
 		log.Infof("Mapped torrents to %d unique torrent files", tfm.Length())
 
+		var hfm hardlinkfilemap.HardlinkFileMapI
+		if sliceutils.StringSliceContains(clientFilter.MapHardlinksFor, "clean", true) {
+			// download path mapping
+			clientDownloadPathMapping, err := getClientDownloadPathMapping(clientConfig)
+			if err != nil {
+				log.WithError(err).Fatal("Failed loading client download path mappings")
+			} else if clientDownloadPathMapping != nil {
+				log.Debugf("Loaded %d client download path mappings: %#v", len(clientDownloadPathMapping),
+					clientDownloadPathMapping)
+			}
+
+			// create map of paths associated to underlying file ids
+			start := time.Now()
+			hfm = hardlinkfilemap.New(torrents, clientDownloadPathMapping)
+			log.Infof("Mapped all torrent file paths to %d unique underlying file IDs in %s", hfm.Length(), time.Since(start))
+
+			// add HardlinkedOutsideClient field to torrents
+			for h, t := range torrents {
+				t.HardlinkedOutsideClient = hfm.HardlinkedOutsideClient(t)
+				torrents[h] = t
+			}
+		} else {
+			log.Warnf("Not mapping hardlinks for client %q", clientName)
+			log.Warnf("If your setup involves multiple torrents sharing the same underlying file using hardlinks, or you are using the 'HardlinkedOutsideClient' field in your filters, you should add 'clean' to the 'MapHardlinksFor' field in your filter configuration")
+			hfm = hardlinkfilemap.NewNoopHardlinkFileMap()
+		}
+
 		// remove torrents that are not ignored and match remove criteria
-		if err := removeEligibleTorrents(log, c, torrents, tfm); err != nil {
+		if err := removeEligibleTorrents(log, c, torrents, tfm, hfm); err != nil {
 			log.WithError(err).Fatal("Failed removing eligible torrents...")
 		}
 	},
