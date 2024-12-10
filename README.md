@@ -7,6 +7,8 @@
 # tqm
 CLI tool to manage your torrent client queues. Primary focus is on removing torrents that meet specific criteria.
 
+This is a fork from [l3uddz](https://github.com/l3uddz/tqm).
+
 ## Example Configuration
 ```yaml
 clients:
@@ -246,15 +248,3 @@ filters:
 `FreeSpaceGB()` will only increase as torrents are hard-removed.
 
 This only works with one disk referenced by `free_space_path` and will not account for torrents being on **different disks**.
-
-# Donate
-
-If you find this project helpful, feel free to make a small donation to the developer:
-
-  - [Monzo](https://monzo.me/today): Credit Cards, Apple Pay, Google Pay
-
-  - [Paypal: l3uddz@gmail.com](https://www.paypal.me/l3uddz)
-  
-  - [GitHub Sponsor](https://github.com/sponsors/l3uddz): GitHub matches contributions for first 12 months.
-
-  - BTC: 3CiHME1HZQsNNcDL6BArG7PbZLa8zUUgjL
