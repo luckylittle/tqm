@@ -2,11 +2,13 @@ package cmd
 
 import (
 	"bufio"
+	"os"
+
+	"github.com/autobrr/tqm/runtime"
+
 	"github.com/blang/semver"
-	"github.com/l3uddz/tqm/runtime"
 	"github.com/rhysd/go-github-selfupdate/selfupdate"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 var updateCmd = &cobra.Command{
@@ -26,7 +28,7 @@ var updateCmd = &cobra.Command{
 
 		// detect latest version
 		log.Info("Checking for the latest version...")
-		latest, found, err := selfupdate.DetectLatest("l3uddz/tqm")
+		latest, found, err := selfupdate.DetectLatest("autobrr/tqm")
 		if err != nil {
 			log.WithError(err).Fatal("Failed determining latest available version")
 		}
