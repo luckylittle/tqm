@@ -39,7 +39,7 @@ var (
 		"tracker nicht registriert",
 		"torrent not found",
 		"trump",
-		"truncated",
+		//"truncated", // Tracker is down
 		"unknown",
 		"unregistered",
 		"upgraded",
