@@ -261,11 +261,11 @@ filters:
 
 ### Conditional Upload Speed Limiting via Tags
 
-You can apply upload speed limits to torrents conditionally based on matching `tag` rules. This is useful for throttling specific groups of torrents (e.g., slow seeders, public torrents).
+You can apply upload speed limits to torrents conditionally based on matching `tag` rules. This is useful for throttling specific groups of torrents (e.g., public torrents).
 
 -   Add an optional `uploadKb` field to any rule within the `tag:` section of your filter definition.
 -   The value should be the desired upload speed limit in **KiB/s**.
--   Use `-1` to signify an unlimited upload speed.
+-   Use `-1` to signify an unlimited upload speed. `500` for 500Kb.
 -   If a torrent matches the `update:` conditions for a tag rule that includes `uploadKb`, the specified speed limit will be applied to that torrent.
 -   This speed limit is applied when you run the `tqm retag <client>` command.
 
@@ -275,22 +275,19 @@ Example:
 filters:
   default:
     tag:
-      # Tag public torrents with many seeders AND limit their upload speed to 50 KiB/s
-      - name: public-slow-seeder
+      # Tag public torrents AND limit their upload speed to 50 KiB/s
+      - name: public
         mode: add
         uploadKb: 50
         update:
           - IsPrivate == false
-          - Seeds < 100
-          - Seeding == true
 
-      # Tag very old private torrents AND remove any upload speed limit
-      - name: private-unlimited-seed
+      # Tag private torrents AND remove any upload speed limit
+      - name: private
         mode: add
         uploadKb: -1
         update:
           - IsPrivate == true
-          - SeedingDays > 100
 ```
 
 ### MapHardlinksFor
