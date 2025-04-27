@@ -1,15 +1,15 @@
 package paths
 
 import (
-	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/autobrr/tqm/logger"
+	"github.com/charlievieth/fastwalk"
 )
-
-/* Structs */
 
 type Path struct {
 	Path         string
@@ -21,40 +21,46 @@ type Path struct {
 	ModifiedTime time.Time
 }
 
-/* Types */
-
 type callbackAllowed func(string) *string
-
-/* Vars */
 
 var (
 	log = logger.GetLogger("pathutils")
 )
 
-/* Public */
-
 func GetPathsInFolder(folder string, includeFiles bool, includeFolders bool, acceptFn callbackAllowed) ([]Path, uint64) {
 	var paths []Path
 	var size uint64 = 0
+	var mutex sync.Mutex
 
-	err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
+	conf := fastwalk.Config{
+		Follow: false,
+	}
+
+	walkFn := func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return fmt.Errorf("walk func: %w", err)
+			log.WithError(err).Errorf("Error accessing path %q during walk", path)
+			if os.IsPermission(err) {
+				log.Warnf("Permission error on %q, continuing walk if possible...", path)
+			}
+			return nil
 		}
 
-		// skip files if not wanted
-		if !includeFiles && !info.IsDir() {
+		if path == folder {
+			return nil
+		}
+
+		isDir := d.IsDir()
+
+		if !includeFiles && !isDir {
 			log.Tracef("Skipping file: %s", path)
 			return nil
 		}
 
-		// skip folders if not wanted
-		if !includeFolders && info.IsDir() {
+		if !includeFolders && isDir {
 			log.Tracef("Skipping folder: %s", path)
 			return nil
 		}
 
-		// skip paths rejected by accept callback
 		realPath := path
 		finalPath := path
 		if acceptFn != nil {
@@ -66,25 +72,33 @@ func GetPathsInFolder(folder string, includeFiles bool, includeFolders bool, acc
 			}
 		}
 
+		info, err := d.Info()
+		if err != nil {
+			log.WithError(err).Errorf("Failed to get file info for %s", path)
+			return nil
+		}
+
 		foundPath := Path{
 			Path:         finalPath,
 			RealPath:     realPath,
 			FileName:     info.Name(),
 			Directory:    filepath.Dir(path),
-			IsDir:        info.IsDir(),
+			IsDir:        isDir,
 			Size:         info.Size(),
 			ModifiedTime: info.ModTime(),
 		}
 
+		mutex.Lock()
 		paths = append(paths, foundPath)
 		size += uint64(info.Size())
+		mutex.Unlock()
 
 		return nil
+	}
 
-	})
-
+	err := fastwalk.Walk(&conf, folder, walkFn)
 	if err != nil {
-		log.WithError(err).Errorf("Failed to retrieve paths from %s", folder)
+		log.WithError(err).Errorf("Failed to walk directory %s", folder)
 	}
 
 	return paths, size

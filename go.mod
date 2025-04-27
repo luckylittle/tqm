@@ -8,6 +8,7 @@ require (
 	github.com/autobrr/go-qbittorrent v1.12.0
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/bobesa/go-domain-util v0.0.0-20190911083921-4033b5f7dd89
+	github.com/charlievieth/fastwalk v1.0.10
 	github.com/dlclark/regexp2 v1.11.5
 	github.com/dustin/go-humanize v1.0.1
 	github.com/expr-lang/expr v1.17.2
@@ -20,11 +21,16 @@ require (
 	github.com/rhysd/go-github-selfupdate v1.2.3
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.9.1
+	github.com/stretchr/testify v1.10.0
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	go.uber.org/ratelimit v0.3.1
 )
 
-require golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f // indirect
+require (
+	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
+	golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f // indirect
+)
 
 require (
 	github.com/Masterminds/semver v1.5.0 // indirect
