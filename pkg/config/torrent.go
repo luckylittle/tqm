@@ -183,11 +183,11 @@ func InitializeTrackerStatuses(perTrackerOverrides map[string][]string) {
 }
 
 func (t *Torrent) IsUnregistered() bool {
-	if t.IsTrackerDown() {
+	if t.TrackerStatus == "" {
 		return false
 	}
 
-	if t.TrackerStatus == "" {
+	if t.IsTrackerDown() {
 		return false
 	}
 
