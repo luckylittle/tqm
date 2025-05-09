@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -26,7 +27,7 @@ func removeSlice(slice []string, remove []string) []string {
 }
 
 // retag torrent that meet required filters
-func retagEligibleTorrents(log *logrus.Entry, c client.TagInterface, torrents map[string]config.Torrent) error {
+func retagEligibleTorrents(ctx context.Context, log *logrus.Entry, c client.TagInterface, torrents map[string]config.Torrent) error {
 	// vars
 	ignoredTorrents := 0
 	retaggedTorrents := 0
@@ -35,7 +36,7 @@ func retagEligibleTorrents(log *logrus.Entry, c client.TagInterface, torrents ma
 	// iterate torrents
 	for h, t := range torrents {
 		// should we retag torrent and/or apply speed limit?
-		retagInfo, err := c.ShouldRetag(&t)
+		retagInfo, err := c.ShouldRetag(ctx, &t)
 		if err != nil {
 			// error while determining whether to evaluate tag rules
 			log.WithError(err).Errorf("Failed evaluating tag rules for: %+v", t)
@@ -79,7 +80,7 @@ func retagEligibleTorrents(log *logrus.Entry, c client.TagInterface, torrents ma
 		if !flagDryRun {
 			// apply tag changes
 			if len(retagInfo.Add) > 0 {
-				if err := c.AddTags(t.Hash, retagInfo.Add); err != nil {
+				if err := c.AddTags(ctx, t.Hash, retagInfo.Add); err != nil {
 					log.WithError(err).Errorf("Failed adding tags %v to torrent: %+v", retagInfo.Add, t)
 					actionFailed = true
 				} else {
@@ -88,7 +89,7 @@ func retagEligibleTorrents(log *logrus.Entry, c client.TagInterface, torrents ma
 				}
 			}
 			if len(retagInfo.Remove) > 0 && !actionFailed {
-				if err := c.RemoveTags(t.Hash, retagInfo.Remove); err != nil {
+				if err := c.RemoveTags(ctx, t.Hash, retagInfo.Remove); err != nil {
 					log.WithError(err).Errorf("Failed removing tags %v from torrent: %+v", retagInfo.Remove, t)
 					actionFailed = true
 				} else {
@@ -103,7 +104,7 @@ func retagEligibleTorrents(log *logrus.Entry, c client.TagInterface, torrents ma
 				if *retagInfo.UploadKb == -1 {
 					limitBytes = -1
 				}
-				if err := c.SetUploadLimit(t.Hash, limitBytes); err != nil {
+				if err := c.SetUploadLimit(ctx, t.Hash, limitBytes); err != nil {
 					log.WithError(err).Errorf("Failed setting upload limit to %d KiB/s for torrent: %+v", *retagInfo.UploadKb, t)
 					actionFailed = true
 				} else {
@@ -135,7 +136,7 @@ func retagEligibleTorrents(log *logrus.Entry, c client.TagInterface, torrents ma
 }
 
 // relabel torrent that meet required filters
-func relabelEligibleTorrents(log *logrus.Entry, c client.Interface, torrents map[string]config.Torrent,
+func relabelEligibleTorrents(ctx context.Context, log *logrus.Entry, c client.Interface, torrents map[string]config.Torrent,
 	tfm *torrentfilemap.TorrentFileMap) error {
 	// vars
 	ignoredTorrents := 0
@@ -146,7 +147,7 @@ func relabelEligibleTorrents(log *logrus.Entry, c client.Interface, torrents map
 	// iterate torrents
 	for h, t := range torrents {
 		// should we relabel torrent?
-		label, relabel, err := c.ShouldRelabel(&t)
+		label, relabel, err := c.ShouldRelabel(ctx, &t)
 		if err != nil {
 			// error while determining whether to relabel torrent
 			log.WithError(err).Errorf("Failed determining whether to relabel: %+v", t)
@@ -187,7 +188,7 @@ func relabelEligibleTorrents(log *logrus.Entry, c client.Interface, torrents map
 			"Tracker Status: %q", t.Ratio, t.SeedingDays, t.Seeds, t.Label, strings.Join(t.Tags, ", "), t.TrackerName, t.TrackerStatus)
 
 		if !flagDryRun {
-			if err := c.SetTorrentLabel(t.Hash, label, hardlink); err != nil {
+			if err := c.SetTorrentLabel(ctx, t.Hash, label, hardlink); err != nil {
 				log.WithError(err).Fatalf("Failed relabeling torrent: %+v", t)
 				errorRelabelTorrents++
 				continue
@@ -213,7 +214,7 @@ func relabelEligibleTorrents(log *logrus.Entry, c client.Interface, torrents map
 }
 
 // remove torrents that meet remove filters
-func removeEligibleTorrents(log *logrus.Entry, c client.Interface, torrents map[string]config.Torrent,
+func removeEligibleTorrents(ctx context.Context, log *logrus.Entry, c client.Interface, torrents map[string]config.Torrent,
 	tfm *torrentfilemap.TorrentFileMap, hfm hardlinkfilemap.HardlinkFileMapI, filter *config.FilterConfiguration) error {
 	// vars
 	ignoredTorrents := 0
@@ -227,9 +228,9 @@ func removeEligibleTorrents(log *logrus.Entry, c client.Interface, torrents map[
 	}
 
 	// helper function to handle removal of torrents that aren't unique
-	handleNonUniqueTorrent := func(h string, t *config.Torrent, isHardlinked bool) bool {
+	handleNonUniqueTorrent := func(ctx context.Context, h string, t *config.Torrent, isHardlinked bool) bool {
 		// Check if torrent is unregistered (can bypass uniqueness checks)
-		if t.IsUnregistered() {
+		if t.IsUnregistered(ctx) {
 			// For unregistered torrents, override safety checks
 			log.Info("-----")
 			if isHardlinked {
@@ -253,7 +254,7 @@ func removeEligibleTorrents(log *logrus.Entry, c client.Interface, torrents map[
 					localDeleteData = false
 				}
 
-				removed, err := c.RemoveTorrent(t.Hash, localDeleteData)
+				removed, err := c.RemoveTorrent(ctx, t.Hash, localDeleteData)
 				if err != nil {
 					log.WithError(err).Errorf("Failed removing torrent: %+v", t)
 					// dont remove from torrents file map, but prevent further operations on this torrent
@@ -310,7 +311,7 @@ func removeEligibleTorrents(log *logrus.Entry, c client.Interface, torrents map[
 	}
 
 	// helper function to remove torrent
-	removeTorrent := func(h string, t *config.Torrent) {
+	removeTorrent := func(ctx context.Context, h string, t *config.Torrent) {
 		// remove the torrent
 		log.Info("-----")
 		if !t.FreeSpaceSet {
@@ -329,7 +330,7 @@ func removeEligibleTorrents(log *logrus.Entry, c client.Interface, torrents map[
 
 		if !flagDryRun {
 			// do remove
-			removed, err := c.RemoveTorrent(t.Hash, deleteData)
+			removed, err := c.RemoveTorrent(ctx, t.Hash, deleteData)
 			if err != nil {
 				log.WithError(err).Fatalf("Failed removing torrent: %+v", t)
 				// dont remove from torrents file map, but prevent further operations on this torrent
@@ -375,13 +376,13 @@ func removeEligibleTorrents(log *logrus.Entry, c client.Interface, torrents map[
 	candidates := make(map[string]config.Torrent)
 	for h, t := range torrents {
 		// should we ignore this torrent?
-		ignore, err := c.ShouldIgnore(&t)
+		ignore, err := c.ShouldIgnore(ctx, &t)
 		if err != nil {
 			// error while determining whether to ignore torrent
 			log.WithError(err).Errorf("Failed determining whether to ignore: %+v", t)
 			delete(torrents, h)
 			continue
-		} else if ignore && !(config.Config.BypassIgnoreIfUnregistered && t.IsUnregistered()) {
+		} else if ignore && !(config.Config.BypassIgnoreIfUnregistered && t.IsUnregistered(ctx)) {
 			// torrent met ignore filter
 			log.Tracef("Ignoring torrent %s: %s", h, t.Name)
 			delete(torrents, h)
@@ -390,7 +391,7 @@ func removeEligibleTorrents(log *logrus.Entry, c client.Interface, torrents map[
 		}
 
 		// should we remove this torrent?
-		remove, err := c.ShouldRemove(&t)
+		remove, err := c.ShouldRemove(ctx, &t)
 		if err != nil {
 			log.WithError(err).Errorf("Failed determining whether to remove: %+v", t)
 			// dont do any further operations on this torrent, but keep in the torrent file map
@@ -419,7 +420,7 @@ func removeEligibleTorrents(log *logrus.Entry, c client.Interface, torrents map[
 		}
 
 		if isNotUnique {
-			if handled := handleNonUniqueTorrent(h, &t, isHardlinked); handled {
+			if handled := handleNonUniqueTorrent(ctx, h, &t, isHardlinked); handled {
 				// Torrent was handled (removed) in the function
 				continue
 			} else {
@@ -429,7 +430,7 @@ func removeEligibleTorrents(log *logrus.Entry, c client.Interface, torrents map[
 			}
 		}
 
-		removeTorrent(h, &t)
+		removeTorrent(ctx, h, &t)
 	}
 
 	log.Info("========================================")
@@ -454,7 +455,7 @@ func removeEligibleTorrents(log *logrus.Entry, c client.Interface, torrents map[
 			continue
 		}
 
-		removeTorrent(h, &t)
+		removeTorrent(ctx, h, &t)
 		removedCandidates++
 	}
 
