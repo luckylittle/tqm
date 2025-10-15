@@ -246,9 +246,6 @@ func relabelEligibleTorrents(ctx context.Context, log *logrus.Entry, c client.In
 
 			canRelabelGroup := true
 			for _, groupTorrent := range group {
-				if groupTorrent.Hash == t.Hash {
-					continue
-				}
 				groupLabel, groupRelabel, err := c.ShouldRelabel(ctx, &groupTorrent)
 				if err != nil || !groupRelabel || groupLabel != label {
 					canRelabelGroup = false
@@ -309,14 +306,6 @@ func relabelTorrent(ctx context.Context, log *logrus.Entry, c client.Interface, 
 	if !t.APIDividerPrinted {
 		log.Info("-----")
 	}
-
-	if hardlink {
-		log.Infof("Relabeling: %q - %s | with hardlinks to: %q", t.Name, label, c.LabelPathMap()[label])
-	} else {
-		log.Infof("Relabeling: %q - %s", t.Name, label)
-	}
-	log.Infof("Ratio: %.3f / Seed days: %.3f / Seeds: %d / Label: %s / Tags: %s / Tracker: %s / "+
-		"Tracker Status: %q", t.Ratio, t.SeedingDays, t.Seeds, t.Label, strings.Join(t.Tags, ", "), t.TrackerName, t.TrackerStatus)
 
 	if !flagDryRun {
 		if err := c.SetTorrentLabel(ctx, t.Hash, label, hardlink); err != nil {
